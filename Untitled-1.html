@@ -1,0 +1,1052 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>STOCK PRO - إدارة المحل السحابية</title>
+    <!-- Tailwind CSS CDN -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- FontAwesome Icons -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <!-- Google Fonts (Cairo) -->
+    <link href="https://fonts.googleapis.com/css2?family=Cairo:wght@300;400;600;700;900&display=swap" rel="stylesheet">
+    
+    <!-- Firebase SDKs -->
+    <script type="module">
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js";
+        import { getDatabase, ref, set, onValue, update } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-database.js";
+
+        // ⚠️ قم بوضع إعدادات الـ Firebase الخاصة بمشروعك هنا
+        const firebaseConfig = {
+            apiKey: "YOUR_API_KEY",
+            authDomain: "YOUR_AUTH_DOMAIN",
+            databaseURL: "https://stock-khaziiin-default-rtdb.europe-west1.firebasedatabase.app/",
+            projectId: "YOUR_PROJECT_ID",
+            storageBucket: "YOUR_STORAGE_BUCKET",
+            messagingSenderId: "YOUR_MESSAGING_SENDER_ID",
+            appId: "YOUR_APP_ID"
+        };
+
+        const app = initializeApp(firebaseConfig);
+        const db = getDatabase(app);
+
+        window.db = db;
+        window.dbRef = ref;
+        window.dbSet = set;
+        window.dbOnValue = onValue;
+        window.dbUpdate = update;
+    </script>
+
+    <style>
+        body { font-family: 'Cairo', sans-serif; background: #030712; color: #f9fafb; min-height: 100vh; }
+        .glass-nav { background: rgba(15, 23, 42, 0.9); backdrop-filter: blur(20px); border-bottom: 1px solid rgba(255, 255, 255, 0.07); }
+        .glass-card { background: rgba(17, 24, 39, 0.75); backdrop-filter: blur(12px); border: 1px solid rgba(255, 255, 255, 0.06); box-shadow: 0 10px 30px -10px rgba(0, 0, 0, 0.5); }
+        .scrollbar-none::-webkit-scrollbar { display: none; }
+    </style>
+</head>
+<body class="pb-32">
+
+    <!-- Header -->
+    <header class="sticky top-0 z-40 glass-nav p-3.5 sm:p-4">
+        <div class="max-w-4xl mx-auto flex items-center justify-between flex-wrap gap-3">
+            <div class="flex items-center gap-3">
+                <div class="w-12 h-12 rounded-2xl bg-gradient-to-tr from-cyan-500 via-indigo-600 to-fuchsia-600 flex items-center justify-center text-white font-black text-2xl shadow-lg shadow-cyan-500/30">
+                    <i class="fa-solid fa-boxes-stacked"></i>
+                </div>
+                <div>
+                    <h1 class="font-black text-lg sm:text-xl text-white tracking-wider flex items-center gap-2">
+                        STOCK <span class="text-xs bg-cyan-500/20 text-cyan-400 border border-cyan-500/30 px-2 py-0.5 rounded-full font-bold">PRO 4K</span>
+                    </h1>
+                    <p class="text-[11px] text-slate-400">إدارة السلع، الستوك، والمبيعات بذكاء</p>
+                </div>
+            </div>
+            <div class="flex items-center gap-2 flex-wrap">
+                <button onclick="togglePrivacy()" id="privacyBtn" class="bg-slate-800/80 hover:bg-slate-700 text-xs px-3 py-2.5 rounded-2xl font-bold border border-slate-700/80 transition flex items-center gap-1.5" title="إخفاء الأرباح">
+                    <i id="privacyIcon" class="fa-solid fa-eye text-cyan-400"></i>
+                    <span id="privacyText" class="hidden sm:inline">الأرباح</span>
+                </button>
+                <button onclick="openSalesModal()" class="bg-emerald-500/15 hover:bg-emerald-500/25 text-xs px-3.5 py-2.5 rounded-2xl font-black border border-emerald-500/30 text-emerald-400 flex items-center gap-1.5 shadow-lg shadow-emerald-500/10 transition">
+                    <i class="fa-solid fa-file-invoice-dollar"></i> تقرير اليوم
+                </button>
+                <button onclick="openModal()" class="bg-gradient-to-r from-cyan-500 to-blue-600 hover:from-cyan-400 hover:to-blue-500 text-slate-950 px-4 py-2.5 rounded-2xl text-xs font-black shadow-lg shadow-cyan-500/25 flex items-center gap-1.5 transition transform active:scale-95">
+                    <i class="fa-solid fa-plus-circle text-sm"></i> إضافة سلعة
+                </button>
+                <button onclick="toggleCartDrawer()" class="relative bg-slate-800/80 hover:bg-slate-700 p-2.5 rounded-2xl border border-slate-700/80 transition">
+                    <i class="fa-solid fa-receipt text-emerald-400 text-base"></i>
+                    <span id="cartCountBadge" class="hidden absolute -top-1 -right-1 bg-emerald-500 text-slate-950 font-black text-[10px] w-5 h-5 rounded-full flex items-center justify-center shadow">0</span>
+                </button>
+            </div>
+        </div>
+    </header>
+
+    <main class="max-w-4xl mx-auto px-4 pt-5">
+        <!-- Main Navigation Tabs -->
+        <div class="grid grid-cols-3 gap-2 mb-5 bg-slate-900/90 p-1.5 rounded-2xl border border-slate-800 shadow-xl">
+            <button onclick="switchMainTab('stock')" id="tabBtn-stock" class="main-tab bg-cyan-500 text-slate-950 py-2.5 rounded-xl text-xs font-black transition flex items-center justify-center gap-2 shadow-lg shadow-cyan-500/20">
+                <i class="fa-solid fa-box-open"></i> المخزون والسلع
+            </button>
+            <button onclick="switchMainTab('credits')" id="tabBtn-credits" class="main-tab text-slate-400 hover:text-white py-2.5 rounded-xl text-xs font-bold transition flex items-center justify-center gap-2">
+                <i class="fa-solid id-card fa-book-bookmark"></i> دفتر الديون
+            </button>
+            <button onclick="switchMainTab('repairs')" id="tabBtn-repairs" class="main-tab text-slate-400 hover:text-white py-2.5 rounded-xl text-xs font-bold transition flex items-center justify-center gap-2">
+                <i class="fa-solid fa-screwdriver-wrench"></i> الصيانة
+            </button>
+        </div>
+
+        <!-- Quick Stats Bar -->
+        <div id="statsBar" class="grid grid-cols-2 sm:grid-cols-3 gap-3 mb-5">
+            <div class="glass-card p-3.5 rounded-2xl flex items-center gap-3.5">
+                <div class="w-11 h-11 rounded-2xl bg-cyan-500/15 text-cyan-400 flex items-center justify-center text-base font-bold border border-cyan-500/20"><i class="fa-solid fa-cubes"></i></div>
+                <div>
+                    <p class="text-[10px] font-semibold text-slate-400">إجمالي المنتجات</p>
+                    <h4 id="statTotalItems" class="text-base font-black text-white">0</h4>
+                </div>
+            </div>
+            <div class="glass-card p-3.5 rounded-2xl flex items-center gap-3.5">
+                <div class="w-11 h-11 rounded-2xl bg-amber-500/15 text-amber-400 flex items-center justify-center text-base font-bold border border-amber-500/20"><i class="fa-solid fa-warehouse"></i></div>
+                <div>
+                    <p class="text-[10px] font-semibold text-slate-400">القطع في الستوك</p>
+                    <h4 id="statTotalStock" class="text-base font-black text-amber-400">0</h4>
+                </div>
+            </div>
+            <div class="glass-card p-3.5 rounded-2xl col-span-2 sm:col-span-1 flex items-center gap-3.5">
+                <div class="w-11 h-11 rounded-2xl bg-emerald-500/15 text-emerald-400 flex items-center justify-center text-base font-bold border border-emerald-500/20"><i class="fa-solid fa-wallet"></i></div>
+                <div>
+                    <p class="text-[10px] font-semibold text-slate-400">أرباح الستوك المتوقعة</p>
+                    <h4 id="statTotalProfit" class="text-base font-black text-emerald-400">0 DH</h4>
+                </div>
+            </div>
+        </div>
+
+        <!-- TAB 1: STOCK VIEW -->
+        <div id="section-stock" class="space-y-4">
+            <!-- Search Row -->
+            <div class="flex gap-2">
+                <div class="flex-1 bg-slate-900/90 border border-slate-800 rounded-2xl flex items-center px-4 py-3 focus-within:border-cyan-500 transition shadow-inner">
+                    <i class="fa-solid fa-magnifying-glass text-cyan-400 ml-3 text-base"></i>
+                    <input type="text" id="searchInput" oninput="render()" placeholder="ابحث باسم الشاشة، أو الإكسسوار، أو الموديل..." class="w-full bg-transparent text-white placeholder-slate-500 text-sm focus:outline-none">
+                </div>
+            </div>
+
+            <!-- Main Categories -->
+            <div class="grid grid-cols-2 sm:grid-cols-5 gap-2">
+                <button onclick="setCategory('all')" id="cat-all" class="cat-tab bg-cyan-500 text-slate-950 border border-cyan-400 py-3 rounded-2xl text-xs font-black text-center transition shadow-lg shadow-cyan-500/20">الكل</button>
+                <button onclick="setCategory('screen')" id="cat-screen" class="cat-tab bg-slate-900/80 border border-slate-800 text-slate-300 py-3 rounded-2xl text-xs font-bold text-center transition">📺 شاشات</button>
+                <button onclick="setCategory('protector')" id="cat-protector" class="cat-tab bg-slate-900/80 border border-slate-800 text-slate-300 py-3 rounded-2xl text-xs font-bold text-center transition">🛡️ أجهزة واقية</button>
+                <button onclick="setCategory('accessory')" id="cat-accessory" class="cat-tab bg-slate-900/80 border border-slate-800 text-slate-300 py-3 rounded-2xl text-xs font-bold text-center transition">🎧 إكسسوارات</button>
+                <button onclick="setCategory('connector')" id="cat-connector" class="cat-tab bg-slate-900/80 border border-slate-800 text-slate-300 py-3 rounded-2xl text-xs font-bold text-center transition col-span-2 sm:col-span-1">🔌 كونيكتور</button>
+            </div>
+
+            <!-- Sub-Brands Filter (For Screens) -->
+            <div id="brandsContainer" class="hidden flex gap-2 overflow-x-auto pb-2 scrollbar-none">
+                <button onclick="setBrand('all')" id="brand-all" class="brand-btn bg-cyan-500/20 text-cyan-300 border border-cyan-500/40 px-3.5 py-2 rounded-xl text-xs font-bold whitespace-nowrap transition">كل الماركات</button>
+                <button onclick="setBrand('Samsung')" id="brand-Samsung" class="brand-btn bg-slate-900 border border-slate-800 text-slate-300 px-3.5 py-2 rounded-xl text-xs font-bold whitespace-nowrap transition">Samsung</button>
+                <button onclick="setBrand('Redmi')" id="brand-Redmi" class="brand-btn bg-slate-900 border border-slate-800 text-slate-300 px-3.5 py-2 rounded-xl text-xs font-bold whitespace-nowrap transition">Redmi / Xiaomi</button>
+                <button onclick="setBrand('iPhone')" id="brand-iPhone" class="brand-btn bg-slate-900 border border-slate-800 text-slate-300 px-3.5 py-2 rounded-xl text-xs font-bold whitespace-nowrap transition">iPhone</button>
+                <button onclick="setBrand('Oppo')" id="brand-Oppo" class="brand-btn bg-slate-900 border border-slate-800 text-slate-300 px-3.5 py-2 rounded-xl text-xs font-bold whitespace-nowrap transition">Oppo</button>
+                <button onclick="setBrand('Huawei')" id="brand-Huawei" class="brand-btn bg-slate-900 border border-slate-800 text-slate-300 px-3.5 py-2 rounded-xl text-xs font-bold whitespace-nowrap transition">Huawei</button>
+                <button onclick="setBrand('Infinix')" id="brand-Infinix" class="brand-btn bg-slate-900 border border-slate-800 text-slate-300 px-3.5 py-2 rounded-xl text-xs font-bold whitespace-nowrap transition">Infinix</button>
+                <button onclick="setBrand('Realme')" id="brand-Realme" class="brand-btn bg-slate-900 border border-slate-800 text-slate-300 px-3.5 py-2 rounded-xl text-xs font-bold whitespace-nowrap transition">Realme</button>
+                <button onclick="setBrand('Tecno')" id="brand-Tecno" class="brand-btn bg-slate-900 border border-slate-800 text-slate-300 px-3.5 py-2 rounded-xl text-xs font-bold whitespace-nowrap transition">Tecno</button>
+                <button onclick="setBrand('Vivo')" id="brand-Vivo" class="brand-btn bg-slate-900 border border-slate-800 text-slate-300 px-3.5 py-2 rounded-xl text-xs font-bold whitespace-nowrap transition">Vivo</button>
+            </div>
+
+            <!-- Sub-Accessory Filter -->
+            <div id="accessoryContainer" class="hidden flex gap-2 overflow-x-auto pb-2 scrollbar-none">
+                <button onclick="setAccessorySub('all')" id="acc-all" class="acc-btn bg-fuchsia-500/20 text-fuchsia-300 border border-fuchsia-500/40 px-3.5 py-2 rounded-xl text-xs font-bold whitespace-nowrap transition">كل الإكسسوارات</button>
+                <button onclick="setAccessorySub('earbuds')" id="acc-earbuds" class="acc-btn bg-slate-900 border border-slate-800 text-slate-300 px-3.5 py-2 rounded-xl text-xs font-bold whitespace-nowrap transition">🎵 سماعات أذن</button>
+                <button onclick="setAccessorySub('headphones')" id="acc-headphones" class="acc-btn bg-slate-900 border border-slate-800 text-slate-300 px-3.5 py-2 rounded-xl text-xs font-bold whitespace-nowrap transition">🎧 سماعات رأس</button>
+                <button onclick="setAccessorySub('speaker')" id="acc-speaker" class="acc-btn bg-slate-900 border border-slate-800 text-slate-300 px-3.5 py-2 rounded-xl text-xs font-bold whitespace-nowrap transition">🔊 مكبرات صوت</button>
+                <button onclick="setAccessorySub('charger')" id="acc-charger" class="acc-btn bg-slate-900 border border-slate-800 text-slate-300 px-3.5 py-2 rounded-xl text-xs font-bold whitespace-nowrap transition">⚡ الشواحن</button>
+                <button onclick="setAccessorySub('cable')" id="acc-cable" class="acc-btn bg-slate-900 border border-slate-800 text-slate-300 px-3.5 py-2 rounded-xl text-xs font-bold whitespace-nowrap transition">🔌 كابلات اليو إس بي</button>
+                <button onclick="setAccessorySub('charger_cable')" id="acc-charger_cable" class="acc-btn bg-slate-900 border border-slate-800 text-slate-300 px-3.5 py-2 rounded-xl text-xs font-bold whitespace-nowrap transition">🔗 كابلات الشواحن</button>
+            </div>
+
+            <!-- Products List Grid -->
+            <div id="productsGrid" class="grid grid-cols-1 sm:grid-cols-2 gap-4"></div>
+        </div>
+
+        <!-- TAB 2: CREDITS (الكريدي) -->
+        <div id="section-credits" class="hidden space-y-4">
+            <div class="flex justify-between items-center glass-card p-4.5 rounded-2xl">
+                <div>
+                    <h3 class="font-black text-white text-sm sm:text-base">دفتر ديون الزبائن (الكريدي)</h3>
+                    <p class="text-xs text-slate-400">تتبع المبالغ والسلع غير المسددة</p>
+                </div>
+                <button onclick="openCreditModal()" class="bg-amber-500 hover:bg-amber-400 text-slate-950 font-black text-xs px-4 py-2.5 rounded-xl transition flex items-center gap-1.5 shadow-lg shadow-amber-500/20">
+                    <i class="fa-solid fa-plus"></i> دين جديد
+                </button>
+            </div>
+            <div id="creditsListGrid" class="grid grid-cols-1 sm:grid-cols-2 gap-3.5"></div>
+        </div>
+
+        <!-- TAB 3: REPAIRS (الصيانة) -->
+        <div id="section-repairs" class="hidden space-y-4">
+            <div class="flex justify-between items-center glass-card p-4.5 rounded-2xl">
+                <div>
+                    <h3 class="font-black text-white text-sm sm:text-base">إدارة هواتف الصيانة والإصلاح</h3>
+                    <p class="text-xs text-slate-400">متابعة الأجهزة والقطع المسلمة للإصلاح</p>
+                </div>
+                <button onclick="openRepairModal()" class="bg-indigo-600 hover:bg-indigo-500 text-white font-black text-xs px-4 py-2.5 rounded-xl transition flex items-center gap-1.5 shadow-lg shadow-indigo-600/20">
+                    <i class="fa-solid fa-plus"></i> جهاز جديد
+                </button>
+            </div>
+            <div id="repairsListGrid" class="grid grid-cols-1 sm:grid-cols-2 gap-3.5"></div>
+        </div>
+    </main>
+
+    <!-- Modal Form: Product -->
+    <div id="productModal" class="fixed inset-0 bg-slate-950/85 backdrop-blur-md z-50 hidden flex items-center justify-center p-4">
+        <div class="glass-card border border-slate-700/80 rounded-3xl w-full max-w-sm p-6 shadow-2xl">
+            <div class="flex items-center justify-between mb-4 pb-2.5 border-b border-slate-800">
+                <h3 class="font-black text-white text-base">إضافة أو تعديل سلعة</h3>
+                <button onclick="closeModal()" class="w-8 h-8 rounded-xl bg-slate-800 text-slate-400 hover:text-white flex items-center justify-center transition">✕</button>
+            </div>
+            <form onsubmit="saveProductData(event)" class="space-y-3.5">
+                <input type="hidden" id="editId">
+                <div>
+                    <label class="block text-[11px] font-bold text-slate-300 mb-1">اسم السلعة أو الموديل</label>
+                    <input type="text" id="pName" required placeholder="مثلاً: زجاج حماية / شاشة سامسونج" class="w-full bg-slate-900/90 border border-slate-700 rounded-xl p-3 text-white text-sm focus:outline-none focus:border-cyan-500 transition">
+                </div>
+                <div>
+                    <label class="block text-[11px] font-bold text-slate-300 mb-1">القسم الرئيسي</label>
+                    <select id="pCat" onchange="checkCategorySelect()" class="w-full bg-slate-900/90 border border-slate-700 rounded-xl p-3 text-white text-sm focus:outline-none focus:border-cyan-500 transition">
+                        <option value="screen">📺 شاشة هاتف (Ecran)</option>
+                        <option value="protector">🛡️ جهاز واقي (Verre Trempé)</option>
+                        <option value="accessory">🎧 إكسسوارات</option>
+                        <option value="connector">🔌 كونيكتور شحن</option>
+                    </select>
+                </div>
+                
+                <!-- Brand Select (For Screen Only) -->
+                <div id="brandSelectBox" style="display:none;">
+                    <label class="block text-[11px] font-bold text-cyan-400 mb-1">ماركة الهاتف (Brand)</label>
+                    <select id="pBrand" class="w-full bg-slate-900/90 border border-slate-700 rounded-xl p-3 text-white text-sm">
+                        <option value="Samsung">Samsung</option>
+                        <option value="Redmi">Redmi / Xiaomi</option>
+                        <option value="iPhone">iPhone</option>
+                        <option value="Oppo">Oppo</option>
+                        <option value="Huawei">Huawei</option>
+                        <option value="Infinix">Infinix</option>
+                        <option value="Realme">Realme</option>
+                        <option value="Tecno">Tecno</option>
+                        <option value="Vivo">Vivo</option>
+                    </select>
+                </div>
+
+                <!-- Accessory Subtype Select -->
+                <div id="accessorySelectBox" style="display:none;">
+                    <label class="block text-[11px] font-bold text-fuchsia-400 mb-1">نوع الإكسسوار</label>
+                    <select id="pAccSub" class="w-full bg-slate-900/90 border border-slate-700 rounded-xl p-3 text-white text-sm">
+                        <option value="earbuds">🎵 سماعات أذن</option>
+                        <option value="headphones">🎧 سماعات رأس</option>
+                        <option value="speaker">🔊 مكبرات صوت</option>
+                        <option value="charger">⚡ الشواحن</option>
+                        <option value="cable">🔌 كابلات اليو إس بي</option>
+                        <option value="charger_cable">🔗 كابلات الشواحن</option>
+                    </select>
+                </div>
+
+                <div class="grid grid-cols-2 gap-2.5">
+                    <div>
+                        <label class="block text-[11px] font-bold text-amber-400 mb-1">ثمن الجملة</label>
+                        <input type="number" step="0.5" id="pBuy" required class="w-full bg-slate-900/90 border border-slate-700 rounded-xl p-3 text-amber-400 font-bold text-sm">
+                    </div>
+                    <div>
+                        <label class="block text-[11px] font-bold text-emerald-400 mb-1">ثمن البيع</label>
+                        <input type="number" step="0.5" id="pSell" required class="w-full bg-slate-900/90 border border-slate-700 rounded-xl p-3 text-emerald-400 font-bold text-sm">
+                    </div>
+                </div>
+                <div>
+                    <label class="block text-[11px] font-bold text-slate-300 mb-1">الستوك المتوفر</label>
+                    <input type="number" id="pStock" required class="w-full bg-slate-900/90 border border-slate-700 rounded-xl p-3 text-white font-bold text-sm">
+                </div>
+                <div class="flex items-center gap-2.5 pt-2">
+                    <button type="submit" class="w-full bg-gradient-to-r from-cyan-500 to-blue-600 hover:from-cyan-400 hover:to-blue-500 text-slate-950 font-black py-3 rounded-2xl text-xs transition shadow-lg shadow-cyan-500/20">حفظ السلعة</button>
+                    <button type="button" onclick="closeModal()" class="w-full bg-slate-800 hover:bg-slate-700 text-slate-300 font-bold py-3 rounded-2xl text-xs transition border border-slate-700">إلغاء</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- Modal Form: Credit (الكريدي) -->
+    <div id="creditModal" class="fixed inset-0 bg-slate-950/85 backdrop-blur-md z-50 hidden flex items-center justify-center p-4">
+        <div class="glass-card border border-slate-700/80 rounded-3xl w-full max-w-sm p-6 shadow-2xl">
+            <div class="flex items-center justify-between mb-4 pb-2.5 border-b border-slate-800">
+                <h3 class="font-black text-white text-base">تسجيل دين جديد (كريدي)</h3>
+                <button onclick="closeCreditModal()" class="w-8 h-8 rounded-xl bg-slate-800 text-slate-400 hover:text-white flex items-center justify-center transition">✕</button>
+            </div>
+            <form onsubmit="saveCreditData(event)" class="space-y-3.5">
+                <div>
+                    <label class="block text-[11px] font-bold text-slate-300 mb-1">اسم الزبون</label>
+                    <input type="text" id="cName" required placeholder="اسم الزبون" class="w-full bg-slate-900/90 border border-slate-700 rounded-xl p-3 text-white text-sm">
+                </div>
+                <div>
+                    <label class="block text-[11px] font-bold text-slate-300 mb-1">رقم الهاتف</label>
+                    <input type="tel" id="cPhone" placeholder="07xxxxxxxx" class="w-full bg-slate-900/90 border border-slate-700 rounded-xl p-3 text-white text-sm">
+                </div>
+                <div>
+                    <label class="block text-[11px] font-bold text-amber-400 mb-1">المبلغ المالي (DH)</label>
+                    <input type="number" step="0.5" id="cAmount" required class="w-full bg-slate-900/90 border border-slate-700 rounded-xl p-3 text-amber-400 font-bold text-sm">
+                </div>
+                <div>
+                    <label class="block text-[11px] font-bold text-slate-300 mb-1">ملاحظة / السلع المطلوبة</label>
+                    <input type="text" id="cNote" placeholder="مثلاً: ثمن شاشة أو إكسسوار" class="w-full bg-slate-900/90 border border-slate-700 rounded-xl p-3 text-white text-sm">
+                </div>
+                <div class="flex items-center gap-2.5 pt-2">
+                    <button type="submit" class="w-full bg-amber-500 hover:bg-amber-400 text-slate-950 font-black py-3 rounded-2xl text-xs transition shadow-lg shadow-amber-500/20">حفظ الدين</button>
+                    <button type="button" onclick="closeCreditModal()" class="w-full bg-slate-800 hover:bg-slate-700 text-slate-300 font-bold py-3 rounded-2xl text-xs transition border border-slate-700">إلغاء</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- Modal Form: Repair (الصيانة) -->
+    <div id="repairModal" class="fixed inset-0 bg-slate-950/85 backdrop-blur-md z-50 hidden flex items-center justify-center p-4">
+        <div class="glass-card border border-slate-700/80 rounded-3xl w-full max-w-sm p-6 shadow-2xl">
+            <div class="flex items-center justify-between mb-4 pb-2.5 border-b border-slate-800">
+                <h3 class="font-black text-white text-base">تسجيل هاتف للصيانة</h3>
+                <button onclick="closeRepairModal()" class="w-8 h-8 rounded-xl bg-slate-800 text-slate-400 hover:text-white flex items-center justify-center transition">✕</button>
+            </div>
+            <form onsubmit="saveRepairData(event)" class="space-y-3.5">
+                <div>
+                    <label class="block text-[11px] font-bold text-slate-300 mb-1">اسم الزبون</label>
+                    <input type="text" id="rClientName" required placeholder="اسم الزبون" class="w-full bg-slate-900/90 border border-slate-700 rounded-xl p-3 text-white text-sm">
+                </div>
+                <div>
+                    <label class="block text-[11px] font-bold text-slate-300 mb-1">موديل الهاتف</label>
+                    <input type="text" id="rDevice" required placeholder="مثلاً: Samsung A12" class="w-full bg-slate-900/90 border border-slate-700 rounded-xl p-3 text-white text-sm">
+                </div>
+                <div>
+                    <label class="block text-[11px] font-bold text-slate-300 mb-1">نوع العطل / الإصلاح المطلوبة</label>
+                    <input type="text" id="rIssue" required placeholder="مثلاً: تغيير الشاشة + تبديل الكونيكتور" class="w-full bg-slate-900/90 border border-slate-700 rounded-xl p-3 text-white text-sm">
+                </div>
+                <div>
+                    <label class="block text-[11px] font-bold text-emerald-400 mb-1">المبلغ المتفق عليه (DH)</label>
+                    <input type="number" step="0.5" id="rPrice" required class="w-full bg-slate-900/90 border border-slate-700 rounded-xl p-3 text-emerald-400 font-bold text-sm">
+                </div>
+                <div class="flex items-center gap-2.5 pt-2">
+                    <button type="submit" class="w-full bg-indigo-600 hover:bg-indigo-500 text-white font-black py-3 rounded-2xl text-xs transition shadow-lg shadow-indigo-600/20">تسجيل الجهاز</button>
+                    <button type="button" onclick="closeRepairModal()" class="w-full bg-slate-800 hover:bg-slate-700 text-slate-300 font-bold py-3 rounded-2xl text-xs transition border border-slate-700">إلغاء</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- Daily Closing Report & Sales History Modal -->
+    <div id="salesModal" class="fixed inset-0 bg-slate-950/85 backdrop-blur-md z-50 hidden flex items-center justify-center p-3 sm:p-4">
+        <div class="glass-card border border-slate-700/80 rounded-3xl w-full max-w-2xl p-5 sm:p-6 shadow-2xl max-h-[88vh] flex flex-col">
+            <div class="flex items-center justify-between mb-4 pb-3 border-b border-slate-800">
+                <div class="flex items-center gap-3">
+                    <div class="w-10 h-10 rounded-2xl bg-emerald-500/20 text-emerald-400 flex items-center justify-center border border-emerald-500/30">
+                        <i class="fa-solid fa-cash-register text-base"></i>
+                    </div>
+                    <div>
+                        <h3 class="font-black text-white text-base">تقرير إغلاق المحل وسجل المبيعات</h3>
+                        <p id="reportDateLabel" class="text-[11px] text-slate-400"></p>
+                    </div>
+                </div>
+                <button onclick="closeSalesModal()" class="w-8 h-8 rounded-xl bg-slate-800 text-slate-400 hover:text-white flex items-center justify-center transition">✕</button>
+            </div>
+
+            <!-- Filter Tabs (Today vs All) -->
+            <div class="flex gap-2.5 mb-4">
+                <button onclick="setSalesFilter('today')" id="filterSales-today" class="flex-1 bg-emerald-500 text-slate-950 font-black py-2.5 rounded-xl text-xs transition shadow-md">
+                    📅 مبيعات اليوم (حساب الإغلاق)
+                </button>
+                <button onclick="setSalesFilter('all')" id="filterSales-all" class="flex-1 bg-slate-800 hover:bg-slate-700 text-slate-300 font-bold py-2.5 rounded-xl text-xs transition">
+                    🗂️ كل السجل السابق
+                </button>
+            </div>
+
+            <!-- Closing Summary Cards -->
+            <div class="grid grid-cols-3 gap-2.5 mb-4">
+                <div class="bg-slate-950/80 border border-slate-800/80 p-3.5 rounded-2xl text-center shadow-inner">
+                    <p class="text-[10px] text-slate-400 mb-1">إجمالي المبيعات (الكيس)</p>
+                    <h4 id="dailyRevenueVal" class="text-sm sm:text-base font-black text-cyan-400">0 DH</h4>
+                </div>
+                <div class="bg-slate-950/80 border border-emerald-500/30 p-3.5 rounded-2xl text-center shadow-inner">
+                    <p class="text-[10px] text-slate-400 mb-1">الربح الصافي</p>
+                    <h4 id="dailyProfitVal" class="text-sm sm:text-base font-black text-emerald-400">+0 DH</h4>
+                </div>
+                <div class="bg-slate-950/80 border border-amber-500/30 p-3.5 rounded-2xl text-center shadow-inner">
+                    <p class="text-[10px] text-slate-400 mb-1">نسبة الربح</p>
+                    <h4 id="dailyMarginVal" class="text-sm sm:text-base font-black text-amber-400">0%</h4>
+                </div>
+            </div>
+
+            <!-- Detailed Sales List -->
+            <div id="salesHistoryList" class="flex-1 overflow-y-auto space-y-2.5 mb-4 pr-1 scrollbar-none"></div>
+
+            <div class="flex gap-2">
+                <button onclick="closeSalesModal()" class="w-full bg-cyan-500 hover:bg-cyan-400 text-slate-950 font-black py-3 rounded-2xl text-xs transition shadow-lg shadow-cyan-500/20">إغلاق التقرير</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Cart Drawer -->
+    <div id="cartOverlay" onclick="toggleCartDrawer()" class="fixed inset-0 bg-slate-950/70 z-50 hidden backdrop-blur-xs"></div>
+    <div id="cartDrawer" class="fixed inset-y-0 left-0 w-80 sm:w-96 bg-slate-900 border-r border-slate-800 z-50 transform -translate-x-full transition-transform duration-300 flex flex-col shadow-2xl">
+        <div class="p-4.5 bg-slate-950 border-b border-slate-800 flex items-center justify-between">
+            <h3 class="font-black text-white flex items-center gap-2"><i class="fa-solid fa-receipt text-cyan-400"></i> حاسبة الفاتورة</h3>
+            <button onclick="toggleCartDrawer()" class="w-8 h-8 rounded-xl bg-slate-800 text-slate-400 hover:text-white flex items-center justify-center transition">✕</button>
+        </div>
+        <div id="cartItemsList" class="flex-1 overflow-y-auto p-4 space-y-2.5"></div>
+        <div class="p-4.5 bg-slate-950 border-t border-slate-800 space-y-3">
+            <div class="flex justify-between text-base font-black text-cyan-400">
+                <span>المجموع:</span> <span id="cartTotalSum">0 DH</span>
+            </div>
+            <button onclick="checkoutCart()" class="w-full bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-black py-3.5 rounded-2xl text-xs shadow-lg shadow-emerald-500/25 transition">تأكيد البيع ✓</button>
+        </div>
+    </div>
+
+    <!-- Toast Notification -->
+    <div id="toast" class="fixed bottom-5 left-5 bg-emerald-500 text-slate-950 font-black px-4.5 py-3 rounded-2xl shadow-2xl translate-y-20 opacity-0 transition-all duration-300 z-50 text-xs flex items-center gap-2 border border-emerald-400">
+        <i class="fa-solid fa-circle-check text-base"></i>
+        <span id="toastMsg">تمت العملية</span>
+    </div>
+
+    <script>
+        let products = [];
+        let salesHistory = [];
+        let credits = [];
+        let repairs = [];
+        let activeCat = 'all';
+        let activeBrand = 'all';
+        let activeAccSub = 'all';
+        let cart = [];
+        let isPrivacy = false;
+        let currentMainTab = 'stock';
+        let salesFilterMode = 'today';
+
+        function getTodayKey() {
+            const d = new Date();
+            return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+        }
+
+        function getFormattedTime() {
+            const d = new Date();
+            return d.toLocaleTimeString('ar-MA', { hour: '2-digit', minute: '2-digit' });
+        }
+
+        window.addEventListener('DOMContentLoaded', () => {
+            const checkFirebase = setInterval(() => {
+                if (window.db) {
+                    clearInterval(checkFirebase);
+                    initRealtimeSync();
+                }
+            }, 100);
+        });
+
+        function switchMainTab(tab) {
+            currentMainTab = tab;
+            document.querySelectorAll('.main-tab').forEach(b => {
+                b.className = "main-tab text-slate-400 hover:text-white py-2.5 rounded-xl text-xs font-bold transition flex items-center justify-center gap-2";
+            });
+            document.getElementById(`tabBtn-${tab}`).className = "main-tab bg-cyan-500 text-slate-950 py-2.5 rounded-xl text-xs font-black transition flex items-center justify-center gap-2 shadow-lg shadow-cyan-500/20";
+
+            document.getElementById('section-stock').classList.toggle('hidden', tab !== 'stock');
+            document.getElementById('section-credits').classList.toggle('hidden', tab !== 'credits');
+            document.getElementById('section-repairs').classList.toggle('hidden', tab !== 'repairs');
+            
+            if(tab === 'credits') renderCredits();
+            if(tab === 'repairs') renderRepairs();
+        }
+
+        function initRealtimeSync() {
+            window.dbOnValue(window.dbRef(window.db, 'electro_agrame/products'), (snapshot) => {
+                const data = snapshot.val();
+                if (data) {
+                    products = Array.isArray(data) ? data : Object.values(data);
+                } else {
+                    products = [
+                        { id: 1, name: "شاشة Samsung A12", cat: "screen", brand: "Samsung", accSub: "", buy: 180, sell: 250, stock: 6 },
+                        { id: 2, name: "زجاج حماية عالي الجودة", cat: "protector", brand: "", accSub: "", buy: 10, sell: 30, stock: 25 },
+                        { id: 3, name: "شاحن سريع 25W", cat: "accessory", brand: "", accSub: "charger", buy: 50, sell: 90, stock: 12 },
+                        { id: 4, name: "كونيكتور Type-C", cat: "connector", brand: "", accSub: "", buy: 5, sell: 20, stock: 10 }
+                    ];
+                    syncToCloud();
+                }
+                render();
+            });
+
+            window.dbOnValue(window.dbRef(window.db, 'electro_agrame/sales'), (snapshot) => {
+                const data = snapshot.val();
+                salesHistory = data ? (Array.isArray(data) ? data : Object.values(data)) : [];
+                if (!document.getElementById('salesModal').classList.contains('hidden')) {
+                    renderSalesReport();
+                }
+            });
+
+            window.dbOnValue(window.dbRef(window.db, 'electro_agrame/credits'), (snapshot) => {
+                const data = snapshot.val();
+                credits = data ? (Array.isArray(data) ? data : Object.values(data)) : [];
+                if(currentMainTab === 'credits') renderCredits();
+            });
+
+            window.dbOnValue(window.dbRef(window.db, 'electro_agrame/repairs'), (snapshot) => {
+                const data = snapshot.val();
+                repairs = data ? (Array.isArray(data) ? data : Object.values(data)) : [];
+                if(currentMainTab === 'repairs') renderRepairs();
+            });
+        }
+
+        function syncToCloud() {
+            if (!window.db) return;
+            window.dbSet(window.dbRef(window.db, 'electro_agrame/products'), products);
+            window.dbSet(window.dbRef(window.db, 'electro_agrame/sales'), salesHistory);
+            window.dbSet(window.dbRef(window.db, 'electro_agrame/credits'), credits);
+            window.dbSet(window.dbRef(window.db, 'electro_agrame/repairs'), repairs);
+        }
+
+        function showToast(msg) {
+            let t = document.getElementById('toast');
+            document.getElementById('toastMsg').textContent = msg;
+            t.classList.remove('translate-y-20', 'opacity-0');
+            setTimeout(() => t.classList.add('translate-y-20', 'opacity-0'), 2500);
+        }
+
+        function render() {
+            const grid = document.getElementById('productsGrid');
+            const search = document.getElementById('searchInput').value.trim().toLowerCase();
+            grid.innerHTML = '';
+
+            let filtered = products.filter(p => {
+                let matchCat = (activeCat === 'all' || p.cat === activeCat);
+                let matchBrand = (activeCat !== 'screen' || activeBrand === 'all' || p.brand === activeBrand);
+                let matchAcc = (activeCat !== 'accessory' || activeAccSub === 'all' || p.accSub === activeAccSub);
+                let matchSearch = p.name.toLowerCase().includes(search);
+                return matchCat && matchBrand && matchAcc && matchSearch;
+            });
+
+            document.getElementById('statTotalItems').textContent = products.length;
+            let totalStockCount = products.reduce((sum, p) => sum + (Number(p.stock) || 0), 0);
+            document.getElementById('statTotalStock').textContent = totalStockCount;
+
+            let totalProfitSum = products.reduce((sum, p) => {
+                let buyPrice = Number(p.buy) || 0;
+                let sellPrice = Number(p.sell) || 0;
+                let stockCount = Number(p.stock) || 0;
+                return sum + ((sellPrice - buyPrice) * stockCount);
+            }, 0);
+            document.getElementById('statTotalProfit').textContent = isPrivacy ? "**** DH" : (totalProfitSum + " DH");
+
+            if (filtered.length === 0) {
+                grid.innerHTML = '<div class="col-span-full text-center py-12 text-slate-500 text-sm">لا توجد منتجات مطابقة في المخزون</div>';
+                return;
+            }
+
+            filtered.forEach(p => {
+                let profit = Number(p.sell) - Number(p.buy);
+                let isOut = p.stock <= 0;
+                let isLowStock = p.stock > 0 && p.stock <= 3;
+
+                let badgeText = p.cat;
+                if(p.cat === 'screen') badgeText = '📺 شاشة ' + (p.brand || '');
+                else if(p.cat === 'protector') badgeText = '🛡️ جهاز واقي';
+                else if(p.cat === 'accessory') {
+                    let subNames = { earbuds: 'سماعة أذن', headphones: 'سماعة رأس', speaker: 'مكبر صوت', charger: 'شاحن', cable: 'كابل USB', charger_cable: 'كابل شاحن' };
+                    badgeText = '🎧 ' + (subNames[p.accSub] || 'إكسسوار');
+                } else if(p.cat === 'connector') {
+                    badgeText = '🔌 كونيكتور';
+                }
+
+                grid.innerHTML += `
+                    <div class="glass-card rounded-2xl p-4 flex flex-col justify-between border ${isLowStock ? 'border-amber-500/60' : 'border-slate-800/80'} shadow-xl transition hover:border-slate-700">
+                        <div>
+                            <div class="flex justify-between items-start mb-2.5">
+                                <span class="text-[10px] font-bold px-2.5 py-1 rounded-xl bg-cyan-500/15 text-cyan-400 border border-cyan-500/25">${badgeText}</span>
+                                <div class="flex items-center gap-1.5">
+                                    <button onclick="openModal(${p.id})" class="text-cyan-400 hover:text-white p-1.5 rounded-xl bg-slate-800/80 text-xs transition" title="تعديل"><i class="fa-solid fa-pen-to-square"></i></button>
+                                    <button onclick="deleteProduct(${p.id})" class="text-rose-400 hover:text-white p-1.5 rounded-xl bg-slate-800/80 text-xs transition" title="حذف"><i class="fa-solid fa-trash"></i></button>
+                                </div>
+                            </div>
+                            <h3 class="font-bold text-white text-sm mb-2.5">${p.name}</h3>
+                            <div class="bg-slate-950/70 p-2.5 rounded-xl mb-3 space-y-1 text-xs border border-slate-900 ${isPrivacy?'hidden':''}">
+                                <div class="flex justify-between text-slate-400"><span>الجملة:</span> <span class="text-amber-400 font-bold">${p.buy} DH</span></div>
+                                <div class="flex justify-between text-slate-400"><span>الربح:</span> <span class="text-emerald-400 font-black">+${profit} DH</span></div>
+                            </div>
+                            <div class="flex items-center justify-between bg-slate-900/90 p-2.5 rounded-xl mb-3 text-xs border border-slate-800/80">
+                                <span class="text-slate-400">الستوك المتوفر:</span>
+                                <div class="flex items-center gap-2">
+                                    <button onclick="changeStock(${p.id}, -1)" class="w-7 h-7 bg-slate-800 hover:bg-slate-700 text-slate-300 rounded-xl flex items-center justify-center font-bold transition">-</button>
+                                    <span class="font-black text-cyan-400 text-sm">${p.stock}</span>
+                                    <button onclick="changeStock(${p.id}, 1)" class="w-7 h-7 bg-slate-800 hover:bg-slate-700 text-slate-300 rounded-xl flex items-center justify-center font-bold transition">+</button>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="pt-2.5 border-t border-slate-800/80 flex items-center justify-between">
+                            <span class="text-base font-black text-emerald-400">${p.sell} DH</span>
+                            <div class="flex gap-1.5">
+                                <button onclick="quickSell(${p.id})" ${isOut?'disabled':''} class="bg-emerald-500/20 hover:bg-emerald-500/30 text-emerald-300 px-3 py-1.5 rounded-xl text-xs font-bold transition border border-emerald-500/30 disabled:opacity-40">بيع 1</button>
+                                <button onclick="addToCart(${p.id})" ${isOut?'disabled':''} class="bg-slate-800 hover:bg-slate-700 text-slate-200 px-3 py-1.5 rounded-xl text-xs font-bold transition border border-slate-700/80 disabled:opacity-40">للحساب</button>
+                            </div>
+                        </div>
+                    </div>
+                `;
+            });
+        }
+
+        function renderCredits() {
+            const grid = document.getElementById('creditsListGrid');
+            if (credits.length === 0) {
+                grid.innerHTML = '<div class="col-span-full text-center py-12 text-slate-500 text-sm">لا توجد ديون مسجلة حالياً</div>';
+                return;
+            }
+            grid.innerHTML = credits.map(c => `
+                <div class="glass-card rounded-2xl p-4 flex flex-col justify-between border border-slate-800 shadow-xl">
+                    <div>
+                        <div class="flex justify-between items-start mb-2.5">
+                            <h4 class="font-bold text-white text-sm"><i class="fa-solid fa-user text-cyan-400 ml-1.5"></i> ${c.name}</h4>
+                            <button onclick="deleteCredit(${c.id})" class="text-rose-400 hover:text-white px-2.5 py-1 bg-slate-800/80 hover:bg-slate-700 rounded-xl text-xs font-bold transition"><i class="fa-solid fa-check text-xs ml-1"></i> تسديد</button>
+                        </div>
+                        <p class="text-xs text-slate-400 mb-1"><i class="fa-solid fa-phone text-slate-500 ml-1"></i> ${c.phone || 'بدون رقم'}</p>
+                        <p class="text-xs text-slate-300 mb-3 bg-slate-950/60 p-2.5 rounded-xl border border-slate-900">${c.note || 'بدون ملاحظة'}</p>
+                    </div>
+                    <div class="pt-2.5 border-t border-slate-800 flex justify-between items-center">
+                        <span class="text-[10px] text-slate-500">${c.date}</span>
+                        <span class="text-sm font-black text-amber-400">${c.amount} DH</span>
+                    </div>
+                </div>
+            `).join('');
+        }
+
+        function renderRepairs() {
+            const grid = document.getElementById('repairsListGrid');
+            if (repairs.length === 0) {
+                grid.innerHTML = '<div class="col-span-full text-center py-12 text-slate-500 text-sm">لا توجد هواتف في الصيانة حالياً</div>';
+                return;
+            }
+            grid.innerHTML = repairs.map(r => `
+                <div class="glass-card rounded-2xl p-4 flex flex-col justify-between border border-slate-800 shadow-xl">
+                    <div>
+                        <div class="flex justify-between items-start mb-2.5">
+                            <h4 class="font-bold text-white text-sm"><i class="fa-solid fa-mobile-screen text-indigo-400 ml-1.5"></i> ${r.device}</h4>
+                            <span class="text-[10px] font-bold px-2.5 py-1 rounded-xl bg-indigo-500/20 text-indigo-300 border border-indigo-500/30">${r.status || 'قيد الإصلاح'}</span>
+                        </div>
+                        <p class="text-xs text-slate-300 mb-1"><strong class="text-slate-400">الزبون:</strong> ${r.clientName}</p>
+                        <p class="text-xs text-slate-300 mb-3 bg-slate-950/60 p-2.5 rounded-xl border border-slate-900"><strong class="text-slate-400">العطل:</strong> ${r.issue}</p>
+                    </div>
+                    <div class="pt-2.5 border-t border-slate-800 flex justify-between items-center">
+                        <div class="flex gap-1.5">
+                            <button onclick="toggleRepairStatus(${r.id})" class="text-xs bg-slate-800 hover:bg-slate-700 text-cyan-400 px-2.5 py-1.5 rounded-xl font-bold transition">الحالة</button>
+                            <button onclick="deleteRepair(${r.id})" class="text-xs bg-rose-500/20 hover:bg-rose-500/30 text-rose-300 px-2.5 py-1.5 rounded-xl transition"><i class="fa-solid fa-trash"></i></button>
+                        </div>
+                        <span class="text-sm font-black text-emerald-400">${r.price} DH</span>
+                    </div>
+                </div>
+            `).join('');
+        }
+
+        function setCategory(cat) {
+            activeCat = cat;
+            activeBrand = 'all';
+            activeAccSub = 'all';
+            document.querySelectorAll('.cat-tab').forEach(b => b.className = "cat-tab bg-slate-900/80 border border-slate-800 text-slate-300 py-3 rounded-2xl text-xs font-bold text-center transition");
+            document.getElementById(`cat-${cat}`).className = "cat-tab bg-cyan-500 text-slate-950 border border-cyan-400 py-3 rounded-2xl text-xs font-black text-center transition shadow-lg shadow-cyan-500/20";
+
+            let brandsContainer = document.getElementById('brandsContainer');
+            let accessoryContainer = document.getElementById('accessoryContainer');
+
+            brandsContainer.classList.toggle('hidden', cat !== 'screen');
+            brandsContainer.classList.toggle('flex', cat === 'screen');
+
+            accessoryContainer.classList.toggle('hidden', cat !== 'accessory');
+            accessoryContainer.classList.toggle('flex', cat === 'accessory');
+
+            render();
+        }
+
+        function setBrand(brand) {
+            activeBrand = brand;
+            document.querySelectorAll('.brand-btn').forEach(b => b.className = "brand-btn bg-slate-900 border border-slate-800 text-slate-300 px-3.5 py-2 rounded-xl text-xs font-bold whitespace-nowrap transition");
+            document.getElementById(`brand-${brand}`).className = "brand-btn bg-cyan-500/20 text-cyan-300 border border-cyan-500/40 px-3.5 py-2 rounded-xl text-xs font-bold whitespace-nowrap transition";
+            render();
+        }
+
+        function setAccessorySub(sub) {
+            activeAccSub = sub;
+            document.querySelectorAll('.acc-btn').forEach(b => b.className = "acc-btn bg-slate-900 border border-slate-800 text-slate-300 px-3.5 py-2 rounded-xl text-xs font-bold whitespace-nowrap transition");
+            document.getElementById(`acc-${sub}`).className = "acc-btn bg-fuchsia-500/20 text-fuchsia-300 border border-fuchsia-500/40 px-3.5 py-2 rounded-xl text-xs font-bold whitespace-nowrap transition";
+            render();
+        }
+
+        function checkCategorySelect() {
+            let cat = document.getElementById('pCat').value;
+            document.getElementById('brandSelectBox').style.display = (cat === 'screen') ? 'block' : 'none';
+            document.getElementById('accessorySelectBox').style.display = (cat === 'accessory') ? 'block' : 'none';
+        }
+
+        function changeStock(id, val) {
+            let p = products.find(item => item.id == id);
+            if (!p || p.stock + val < 0) return;
+            p.stock += val;
+            syncToCloud();
+            render();
+        }
+
+        function quickSell(id) {
+            let p = products.find(item => item.id == id);
+            if (!p || p.stock <= 0) return;
+            
+            p.stock -= 1;
+            let sellPrice = Number(p.sell) || 0;
+            let buyPrice = Number(p.buy) || 0;
+            let profit = sellPrice - buyPrice;
+
+            salesHistory.unshift({
+                id: Date.now(),
+                dayKey: getTodayKey(),
+                time: getFormattedTime(),
+                date: new Date().toLocaleString('ar-MA'),
+                items: [{ name: p.name, qty: 1, price: sellPrice, buy: buyPrice, profit: profit }],
+                total: sellPrice,
+                totalProfit: profit
+            });
+
+            syncToCloud();
+            render();
+            showToast(`تم بيع ${p.name} (+${profit} DH ربح) ✓`);
+        }
+
+        function openModal(id = null) {
+            document.getElementById('productModal').classList.remove('hidden');
+            checkCategorySelect();
+            if (id !== null) {
+                let p = products.find(item => item.id == id);
+                document.getElementById('editId').value = p.id;
+                document.getElementById('pName').value = p.name;
+                document.getElementById('pCat').value = p.cat;
+                document.getElementById('pBrand').value = p.brand || 'Samsung';
+                document.getElementById('pAccSub').value = p.accSub || 'earbuds';
+                document.getElementById('pBuy').value = p.buy;
+                document.getElementById('pSell').value = p.sell;
+                document.getElementById('pStock').value = p.stock;
+                checkCategorySelect();
+            } else {
+                document.getElementById('editId').value = '';
+                document.getElementById('pName').value = '';
+                document.getElementById('pCat').value = 'screen';
+                document.getElementById('pBuy').value = '';
+                document.getElementById('pSell').value = '';
+                document.getElementById('pStock').value = '';
+                checkCategorySelect();
+            }
+        }
+        function closeModal() { document.getElementById('productModal').classList.add('hidden'); }
+
+        function openCreditModal() { document.getElementById('creditModal').classList.remove('hidden'); }
+        function closeCreditModal() { document.getElementById('creditModal').classList.add('hidden'); }
+
+        function openRepairModal() { document.getElementById('repairModal').classList.remove('hidden'); }
+        function closeRepairModal() { document.getElementById('repairModal').classList.add('hidden'); }
+
+        function saveProductData(e) {
+            e.preventDefault();
+            let id = document.getElementById('editId').value;
+            let name = document.getElementById('pName').value.trim();
+            let cat = document.getElementById('pCat').value;
+            let brand = (cat === 'screen') ? document.getElementById('pBrand').value : '';
+            let accSub = (cat === 'accessory') ? document.getElementById('pAccSub').value : '';
+            let buy = parseFloat(document.getElementById('pBuy').value) || 0;
+            let sell = parseFloat(document.getElementById('pSell').value) || 0;
+            let stock = parseInt(document.getElementById('pStock').value) || 0;
+
+            if (id) {
+                let p = products.find(item => item.id == id);
+                if (p) { p.name = name; p.cat = cat; p.brand = brand; p.accSub = accSub; p.buy = buy; p.sell = sell; p.stock = stock; }
+            } else {
+                products.unshift({ id: Date.now(), name, cat, brand, accSub, buy, sell, stock });
+            }
+            syncToCloud();
+            closeModal();
+            showToast('تم الحفظ بنجاح ✓');
+        }
+
+        function saveCreditData(e) {
+            e.preventDefault();
+            let name = document.getElementById('cName').value.trim();
+            let phone = document.getElementById('cPhone').value.trim();
+            let amount = parseFloat(document.getElementById('cAmount').value) || 0;
+            let note = document.getElementById('cNote').value.trim();
+
+            credits.unshift({ id: Date.now(), name, phone, amount, note, date: new Date().toLocaleDateString('ar-MA') });
+            syncToCloud();
+            closeCreditModal();
+            renderCredits();
+            showToast('تم تسجيل الدين بنجاح ✓');
+        }
+
+        function deleteCredit(id) {
+            if(confirm('هل تم تسديد هذا الدين؟')) {
+                credits = credits.filter(c => c.id != id);
+                syncToCloud();
+                renderCredits();
+                showToast('تمت تسوية الدين ✓');
+            }
+        }
+
+        function saveRepairData(e) {
+            e.preventDefault();
+            let clientName = document.getElementById('rClientName').value.trim();
+            let device = document.getElementById('rDevice').value.trim();
+            let issue = document.getElementById('rIssue').value.trim();
+            let price = parseFloat(document.getElementById('rPrice').value) || 0;
+
+            repairs.unshift({ id: Date.now(), clientName, device, issue, price, status: 'قيد الإصلاح' });
+            syncToCloud();
+            closeRepairModal();
+            renderRepairs();
+            showToast('تم تسجيل الجهاز بنجاح ✓');
+        }
+
+        function toggleRepairStatus(id) {
+            let r = repairs.find(item => item.id == id);
+            if(r) {
+                r.status = r.status === 'قيد الإصلاح' ? 'تم الإصلاح' : 'تم التسليم';
+                syncToCloud();
+                renderRepairs();
+            }
+        }
+
+        function deleteRepair(id) {
+            if(confirm('حذف السجل؟')) {
+                repairs = repairs.filter(r => r.id != id);
+                syncToCloud();
+                renderRepairs();
+            }
+        }
+
+        function deleteProduct(id) {
+            if (confirm('حذف السلعة؟')) {
+                products = products.filter(item => item.id != id);
+                syncToCloud();
+                render();
+            }
+        }
+
+        function togglePrivacy() { isPrivacy = !isPrivacy; render(); }
+
+        function toggleCartDrawer() {
+            document.getElementById('cartDrawer').classList.toggle('-translate-x-full');
+            document.getElementById('cartOverlay').classList.toggle('hidden');
+        }
+
+        function addToCart(id) {
+            let p = products.find(i => i.id == id);
+            if (!p || p.stock <= 0) return;
+            
+            let cartItem = cart.find(item => item.id == id);
+            if (cartItem) {
+                if (cartItem.qty < p.stock) cartItem.qty += 1;
+            } else {
+                cart.push({ id: p.id, name: p.name, sell: Number(p.sell) || 0, buy: Number(p.buy) || 0, qty: 1 });
+            }
+            updateCartUI();
+            showToast('أضيف للحساب');
+        }
+
+        function removeFromCart(id) {
+            cart = cart.filter(item => item.id != id);
+            updateCartUI();
+        }
+
+        function updateCartUI() {
+            const listEl = document.getElementById('cartItemsList');
+            const badgeEl = document.getElementById('cartCountBadge');
+            const totalEl = document.getElementById('cartTotalSum');
+
+            let totalQty = cart.reduce((sum, i) => sum + i.qty, 0);
+            badgeEl.textContent = totalQty;
+            badgeEl.classList.toggle('hidden', totalQty === 0);
+
+            if (cart.length === 0) {
+                listEl.innerHTML = '<div class="text-center py-10 text-slate-500 text-xs">الحساب فارغ</div>';
+                totalEl.textContent = "0 DH";
+                return;
+            }
+
+            let totalSum = 0;
+            listEl.innerHTML = cart.map(item => {
+                let itemTotal = item.sell * item.qty;
+                totalSum += itemTotal;
+                return `
+                    <div class="bg-slate-950 p-3.5 rounded-2xl flex items-center justify-between border border-slate-800 text-xs shadow">
+                        <div>
+                            <h4 class="font-bold text-white mb-0.5">${item.name}</h4>
+                            <span class="text-cyan-400 font-semibold">${item.qty}x × ${item.sell} DH</span>
+                        </div>
+                        <div class="flex items-center gap-2.5">
+                            <span class="font-black text-emerald-400">${itemTotal} DH</span>
+                            <button onclick="removeFromCart(${item.id})" class="text-rose-400 hover:text-rose-300 p-1.5 rounded-lg bg-slate-900 transition"><i class="fa-solid fa-trash text-xs"></i></button>
+                        </div>
+                    </div>
+                `;
+            }).join('');
+
+            totalEl.textContent = totalSum + " DH";
+        }
+
+        function checkoutCart() {
+            if (cart.length === 0) return;
+            
+            let saleItems = [];
+            let saleTotal = 0;
+            let saleProfit = 0;
+
+            cart.forEach(item => {
+                let p = products.find(prod => prod.id == item.id);
+                let buyPrice = p ? (Number(p.buy) || 0) : (Number(item.buy) || 0);
+                let sellPrice = Number(item.sell) || 0;
+                let itemTotal = sellPrice * item.qty;
+                let itemProfit = (sellPrice - buyPrice) * item.qty;
+
+                saleTotal += itemTotal;
+                saleProfit += itemProfit;
+
+                saleItems.push({
+                    name: item.name,
+                    qty: item.qty,
+                    price: sellPrice,
+                    buy: buyPrice,
+                    profit: itemProfit
+                });
+
+                if (p) {
+                    p.stock = Math.max(0, p.stock - item.qty);
+                }
+            });
+
+            salesHistory.unshift({
+                id: Date.now(),
+                dayKey: getTodayKey(),
+                time: getFormattedTime(),
+                date: new Date().toLocaleString('ar-MA'),
+                items: saleItems,
+                total: saleTotal,
+                totalProfit: saleProfit
+            });
+            
+            cart = [];
+            syncToCloud();
+            updateCartUI();
+            toggleCartDrawer();
+            render();
+            showToast(`تم تأكيد البيع (+${saleProfit} DH ربح) ✓`);
+        }
+
+        function openSalesModal() {
+            salesFilterMode = 'today';
+            document.getElementById('reportDateLabel').textContent = `تاريخ اليوم: ${new Date().toLocaleDateString('ar-MA', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })}`;
+            setSalesFilter('today');
+            document.getElementById('salesModal').classList.remove('hidden');
+        }
+
+        function closeSalesModal() {
+            document.getElementById('salesModal').classList.add('hidden');
+        }
+
+        function setSalesFilter(mode) {
+            salesFilterMode = mode;
+            const btnToday = document.getElementById('filterSales-today');
+            const btnAll = document.getElementById('filterSales-all');
+
+            if (mode === 'today') {
+                btnToday.className = "flex-1 bg-emerald-500 text-slate-950 font-black py-2.5 rounded-xl text-xs transition shadow-md";
+                btnAll.className = "flex-1 bg-slate-800 hover:bg-slate-700 text-slate-300 font-bold py-2.5 rounded-xl text-xs transition";
+            } else {
+                btnAll.className = "flex-1 bg-cyan-500 text-slate-950 font-black py-2.5 rounded-xl text-xs transition shadow-md";
+                btnToday.className = "flex-1 bg-slate-800 hover:bg-slate-700 text-slate-300 font-bold py-2.5 rounded-xl text-xs transition";
+            }
+            renderSalesReport();
+        }
+
+        function renderSalesReport() {
+            const listEl = document.getElementById('salesHistoryList');
+            const todayKey = getTodayKey();
+
+            let filteredSales = salesHistory.filter(s => {
+                if (salesFilterMode === 'all') return true;
+                if (s.dayKey) return s.dayKey === todayKey;
+                return s.date && s.date.includes(new Date().toLocaleDateString('ar-MA'));
+            });
+
+            let totalRevenue = 0;
+            let totalProfit = 0;
+
+            filteredSales.forEach(s => {
+                let rev = Number(s.total) || 0;
+                totalRevenue += rev;
+
+                if (typeof s.totalProfit === 'number') {
+                    totalProfit += s.totalProfit;
+                } else if (Array.isArray(s.items)) {
+                    s.items.forEach(it => {
+                        let prod = products.find(p => p.name === it.name);
+                        let buy = it.buy !== undefined ? Number(it.buy) : (prod ? Number(prod.buy) : 0);
+                        let sell = Number(it.price) || 0;
+                        let qty = Number(it.qty) || 1;
+                        totalProfit += (sell - buy) * qty;
+                    });
+                }
+            });
+
+            let marginPercent = totalRevenue > 0 ? ((totalProfit / totalRevenue) * 100).toFixed(1) : 0;
+
+            document.getElementById('dailyRevenueVal').textContent = `${totalRevenue} DH`;
+            document.getElementById('dailyProfitVal').textContent = `+${totalProfit} DH`;
+            document.getElementById('dailyMarginVal').textContent = `${marginPercent}%`;
+
+            if (filteredSales.length === 0) {
+                listEl.innerHTML = `
+                    <div class="text-center py-12 bg-slate-950/60 rounded-2xl border border-slate-800/80">
+                        <i class="fa-solid fa-receipt text-3xl text-slate-600 mb-2.5"></i>
+                        <p class="text-slate-400 text-xs">لم يتم بيع أي منتج ${salesFilterMode === 'today' ? 'اليوم' : 'بعد'}</p>
+                    </div>
+                `;
+                return;
+            }
+
+            listEl.innerHTML = filteredSales.map(s => {
+                let saleProfit = 0;
+                if (typeof s.totalProfit === 'number') {
+                    saleProfit = s.totalProfit;
+                } else if (Array.isArray(s.items)) {
+                    s.items.forEach(it => {
+                        let prod = products.find(p => p.name === it.name);
+                        let buy = it.buy !== undefined ? Number(it.buy) : (prod ? Number(prod.buy) : 0);
+                        saleProfit += ((Number(it.price) || 0) - buy) * (Number(it.qty) || 1);
+                    });
+                }
+
+                let itemsHtml = '';
+                if (Array.isArray(s.items) && s.items.length > 0) {
+                    itemsHtml = s.items.map(it => `
+                        <div class="flex justify-between items-center text-[11px] text-slate-300 bg-slate-900/90 px-3 py-2 rounded-xl border border-slate-800/80">
+                            <span>• بيع <strong class="text-white">${it.name}</strong> <span class="text-cyan-400 font-bold">(×${it.qty})</span></span>
+                            <span class="font-bold text-slate-200">${(Number(it.price) * Number(it.qty))} DH</span>
+                        </div>
+                    `).join('');
+                } else {
+                    itemsHtml = `<div class="text-[11px] text-slate-400">عملية بيع عامة</div>`;
+                }
+
+                return `
+                    <div class="bg-slate-950/90 p-4 rounded-2xl border border-slate-800 space-y-2.5 shadow">
+                        <div class="flex justify-between items-center border-b border-slate-800/80 pb-2.5">
+                            <span class="text-[11px] text-slate-400"><i class="fa-regular fa-clock text-cyan-400 ml-1"></i> ${s.time || s.date}</span>
+                            <div class="flex items-center gap-2">
+                                <span class="text-[10px] font-bold px-2.5 py-1 rounded-xl bg-emerald-500/15 text-emerald-400 border border-emerald-500/25">ربح: +${saleProfit} DH</span>
+                                <span class="text-xs font-black text-white bg-slate-800 px-3 py-1 rounded-xl">${s.total} DH</span>
+                            </div>
+                        </div>
+                        <div class="space-y-1.5">
+                            ${itemsHtml}
+                        </div>
+                    </div>
+                `;
+            }).join('');
+        }
+    </script>
+</body>
+</html>
